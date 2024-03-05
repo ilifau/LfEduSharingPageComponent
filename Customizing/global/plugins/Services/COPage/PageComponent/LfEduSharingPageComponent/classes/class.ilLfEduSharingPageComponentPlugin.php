@@ -5,12 +5,12 @@ include_once("./Services/COPage/classes/class.ilPageComponentPlugin.php");
  */
 class ilLfEduSharingPageComponentPlugin extends ilPageComponentPlugin {
 
-	const PLUGIN_ID = "xesp";
-	const PLUGIN_NAME = "LfEduSharingPageComponent";
+    public const PLUGIN_ID = "xesp";
+    public const PLUGIN_NAME = "LfEduSharingPageComponent";
 	
-	protected $resId = 0;
-	protected $edus_uri = '';
-	protected $mimetype = '';
+	protected int $resId = 0;
+	protected string $edus_uri = '';
+	protected string $mimetype = '';
 	public $object_version = 0;
 	protected $object_version_use_exact = 0;
 	protected $window_float = 'no';
@@ -18,12 +18,12 @@ class ilLfEduSharingPageComponentPlugin extends ilPageComponentPlugin {
 	protected $window_height_org = 100;
 	public $window_width = 200;
 	public $window_height = 100;
+
 	
-	
-	/**
-	 * @var ilLfEduSharingPageComponentPlugin
-	 */
-	// protected static $instance = NULL;
+//	/**
+//	 * @var ilLfEduSharingPageComponentPlugin
+//	 */
+//	protected static $instance = NULL;
 
 
 	// /**
@@ -37,10 +37,6 @@ class ilLfEduSharingPageComponentPlugin extends ilPageComponentPlugin {
 		// return self::$instance;
 	// }
 
-
-	/**
-	 *
-	 */
 	// public function __construct() {
 		// parent::__construct();
 	// }
@@ -94,7 +90,10 @@ class ilLfEduSharingPageComponentPlugin extends ilPageComponentPlugin {
 	
 	function getUpperCourse()
 	{
-		return ilObject::_lookupObjectId($_GET['ref_id']);//CRS if possible? UK
+        global $tree;
+        $parent_ref_id = $tree->getParentId($this->getRefId());
+        $parent_id = ilObject::_lookupObjId($parent_ref_id);
+        return $parent_id;
 	}
 
 	function getObjID() {
@@ -110,17 +109,15 @@ class ilLfEduSharingPageComponentPlugin extends ilPageComponentPlugin {
 		$this->resId = $a_val;
 	}
 
-	function getResId()
+	public function getResId()
 	{
 		return $this->resId;
 	}
-	
-	// function setRefId($a_id)
-	// {
-		// $this->pc_id = $a_id;
-	// }
 
-
+    public function getRefId()
+    {
+        return $_GET['ref_id'];
+    }
 
 	function setMimetype($a_val)
 	{
@@ -266,7 +263,7 @@ class ilLfEduSharingPageComponentPlugin extends ilPageComponentPlugin {
 		return true;
 	}
 		
-	public function setVars($id) {
+	public function setVars(int $id) {
 		global $DIC;
 		$this->setResId($id);
 		$org_obj = 0;
@@ -275,7 +272,7 @@ class ilLfEduSharingPageComponentPlugin extends ilPageComponentPlugin {
 		$result = $db->query($query);
 		while (($row = $result->fetchAssoc()) !== false) {
 			$this->setUri($row['edus_uri']);
-			$this->setMimetype($row['mimetype']);
+			$this->setMimetype((string) $row['mimetype']);
 			$this->setObjectVersion($row['object_version']);
 			$this->setObjectVersionUseExact($row['object_version_use_exact']);
 			$this->setWindowFloat($row['window_float']);
@@ -288,8 +285,13 @@ class ilLfEduSharingPageComponentPlugin extends ilPageComponentPlugin {
 			// $this->set($row['timemodified']);
 		}
 		if ($org_obj != $this->getObjID()) {
-			$this->includeClass('../../../../Repository/RepositoryObject/LfEduSharingResource/lib/class.lib.php');
-			edusharing_add_instance($this);
+            $service = new EduSharingService();
+            $eduObj = new ilObjLfEduSharingResource();
+            $eduObj->containerId=$this->getUpperCourse();
+            $eduObj->setUri($this->getUri());
+            $eduObj->setId($id);
+            $eduObj->setRefId($this->getRefId());
+            $usageResult = $service->addInstance($eduObj);
 		}
 	}
 	

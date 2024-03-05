@@ -1,11 +1,12 @@
 <?php
-include_once("./Services/COPage/classes/class.ilPageComponentPluginGUI.php");
 
 /**
  * LfEduSharing Page Component GUI
  *
  * @ilCtrl_isCalledBy ilLfEduSharingPageComponentPluginGUI: ilPCPluggedGUI
+ * @ilCtrl_isCalledBy ilLfEduSharingPageComponentPluginGUI: ilUIPluginRouterGUI
  */
+use EduSharingApiClient\EduSharingHelperBase;
 class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
 
 	/** @var  ilLanguage $lng */
@@ -24,25 +25,17 @@ class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
 	protected $plugin;
 
 
-	/**
-	 *
-	 */
 	public function __construct() {
 		global $DIC;
 
 		$this->lng = $DIC->language();
 		$this->ctrl = $DIC->ctrl();
 		$this->tpl = $DIC['tpl'];
-		// $this->LfEduSharing = ilLfEduSharing::getInstance();
 	}
 
 
-	/**
-	 *
-	 */
 	public function executeCommand() {
 		$next_class = $this->ctrl->getNextClass();
-
 		switch($next_class)
 		{
 			default:
@@ -57,21 +50,21 @@ class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
 	/**
 	 * Create new element
 	 */
-	public function insert() {
-		$this->getTicket();
-		include_once("Services/Form/classes/class.ilPropertyFormGUI.php");
-		$form = new ilPropertyFormGUI();
-		include_once("./Services/Form/classes/class.ilTextInputGUI.php");
-		$ti = new ilTextInputGUI($this->lng->txt("search"), "edus_svalue");
-		$ti->setMaxLength(200);
-		$ti->setSize(30);
-		$form->addItem($ti);
-		$form->addCommandButton("create", $this->plugin->txt("search_and_create"));
-		$form->setTitle($this->plugin->txt("search_and_create_form_title"));//$this->getPCGUI()->getHierId()
-		$form->setFormAction($this->ctrl->getFormAction($this));
+	public function insert(): void
+    {
+        global $DIC;
+        $ticket = $this->getTicket();
+        $stext = "";
+        $re_url = ILIAS_HTTP_PATH . '/' . $DIC->ctrl()->getLinkTarget($this, "create", "", false, false);
+        $reposearch = ilObjLfEduSharingResourceGUI::buildUrl("search", $ticket, $stext, $re_url, $DIC->user());
 
-		$this->tpl->setContent($form->getHTML());
+        $ilToolbar = $DIC->toolbar();
+        $search_btn = ilLinkButton::getInstance();
+        $search_btn->setCaption($this->plugin->txt("search_and_create"),false);
+        $search_btn->setUrl($reposearch);
+        $ilToolbar->addButtonInstance($search_btn);
 	}
+
 
 	/**
 	 * Save new element
@@ -80,32 +73,26 @@ class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
 		global $DIC;
 		$properties = $this->getProperties();
 		
-		if (isset($_POST["edus_svalue"])) {
-			$this->plugin->setResId($this->plugin->addUsage(""));
-			$properties['resId'] = $this->plugin->getResId();
-			$this->createElement($properties);
-
-			$a_search = $properties['search'];
-			$this->plugin->includeClass("../../../../Repository/RepositoryObject/LfEduSharingResource/lib/class.lfEduUtil.php");
-			// try
-			// {
-				// $this->plugin->includeClass('../../../../Repository/RepositoryObject/LfEduSharingResource/lib/class.cclib.php');
-				// $cclib = new mod_edusharing_web_service_factory();
-				// $ticket = $cclib->edusharing_authentication_get_ticket();
-				$ticket = $this->getTicket();
-
-				$stext = ilUtil::stripSlashes($_POST["edus_svalue"]);
-				$re_url = ILIAS_HTTP_PATH.'/'.$DIC->ctrl()->getLinkTarget($this, "create", "", false, false).'&resId='.$properties['resId'];
-				// $re_url = str_replace(array("hier_id=pg"), 'hier_id=1', $re_url);
-				$url = lfEduUtil::buildUrl("search", $ticket, $stext, $re_url, $DIC->user());
-			// }
-			// catch (Exception $e)
-			// {
-				// ilUtil::sendFailure(lfEduUtil::formatException($e), true);
-				// $DIC->ctrl()->redirect($this, "edit");
-			// }
-			ilUtil::redirect($url);
-		} else {
+//		if (isset($_POST["edus_svalue"])) {
+//			$this->plugin->setResId($this->plugin->addUsage(""));
+//			$properties['resId'] = $this->plugin->getResId();
+//			$this->createElement($properties);
+//
+//			$a_search = $properties['search'];
+//			try {
+//				$ticket = $this->getTicket();
+//				$stext = ilUtil::stripSlashes($_POST["edus_svalue"]);
+//				$re_url = ILIAS_HTTP_PATH.'/'.$DIC->ctrl()->getLinkTarget($this, "create", "", false, false).'&resId='.$properties['resId'];
+//				// $re_url = str_replace(array("hier_id=pg"), 'hier_id=1', $re_url);
+//				$url = ilObjLfEduSharingResourceGUI::buildUrl("search", $ticket, $stext, $re_url, $DIC->user());
+//			 } catch (Exception $e) {
+//				ilUtil::sendFailure("Create failed", true);
+//                $DIC->ctrl()->redirect($this, "edit");
+//            }
+//			ilUtil::redirect($url);
+//		} else {
+            $this->plugin->setResId($this->plugin->addUsage(""));
+            $properties['resId'] = $this->plugin->getResId();
 			$resId = $properties['resId'];
 			if ($resId == "") $resId = $_REQUEST["resId"]; //Problem in 5.2 nur bei erstem Eintrag! Datenbankeintrag vorhanden.
 			$eduuri = ilUtil::stripSlashes($_REQUEST["nodeId"]);
@@ -121,13 +108,22 @@ class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
 			if ($this->plugin->updateUsage($resId) == true) {
 				ilUtil::sendSuccess($this->lng->txt("msg_obj_created"), true);
 			}
-			
-			$this->plugin->includeClass('../../../../Repository/RepositoryObject/LfEduSharingResource/lib/class.lib.php');
-			edusharing_add_instance($this->plugin);
-			
-			$this->returnToParent();
-			// $this->edit();
-		}
+            $this->createElement($properties);
+
+            $service = new EduSharingService();
+            $eduObj = new ilObjLfEduSharingResource();
+            $eduObj->setUri($this->plugin->getUri());
+            $eduObj->setId($resId);
+            $eduObj->setRefId($this->plugin->getRefId());
+            $usageResult = $service->addInstance($eduObj);
+            if ($usageResult == false) {
+                //delete
+                ilUtil::sendFailure("Create failed (usageResult = false)", true);
+                $this->returnToParent();
+            }
+
+			$this->edit();
+//		}
 	}
 	
 	/**
@@ -135,7 +131,7 @@ class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
 	 */
 	public function edit() {
 		$properties = $this->getProperties();
-		$this->plugin->setVars($properties['resId']);
+        $this->plugin->setVars($properties['resId']);
         $form = $this->editform();
 		$this->tpl->setContent($form->getHTML());
 	}
@@ -170,16 +166,11 @@ class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
 	 */
 	protected function editform() {
 		global $DIC;
-		if (isset($_REQUEST["resId"])) $resId = $_REQUEST["resId"];
-		else {
-			$properties = $this->getProperties();
-			$resId = $properties['resId'];
-		}
-		
-		include_once("Services/Form/classes/class.ilPropertyFormGUI.php");
+        $resId = $this->plugin->getResId();
+
 		$form = new ilPropertyFormGUI();
 		// check whether usage is registered
-		// if ($this->plugin->getUri() != "" && !$this->plugin->checkRegisteredUsage())//$properties['esresource']!=$this->plugin->getUri()
+		//if ($this->plugin->getUri() != "" && !$this->plugin->checkRegisteredUsage())//$properties['esresource']!=$this->plugin->getUri()
 		// {
 			// ilUtil::sendFailure($this->plugin->txt("usage_not_registered"));
 			// $ilToolbar->addFormButton($this->plugin->txt("register_usage"), "registerUsage");
@@ -187,9 +178,7 @@ class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
 		$ne = new ilNonEditableValueGUI($this->plugin->txt("uri"), "uri");
 		$ne->setValue($this->plugin->getUri());
 		$form->addItem($ne);
-		// $ne = new ilNonEditableValueGUI($this->plugin->txt("version"), "version");
-		// $ne->setValue($this->plugin->getObjectVersion());
-		// $form->addItem($ne);
+
 		$ne = new ilNonEditableValueGUI($this->plugin->txt("mimetype"), "mimetype");
 		$ne->setValue($this->plugin->getMimetype());
 		$form->addItem($ne);
@@ -241,7 +230,9 @@ class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
 		$form->addCommandButton("update", $this->lng->txt("update"));
 
 		$form->setTitle($this->lng->txt("settings"));
-		
+
+//        $this->ctrl->setCmd('update');
+
 		$form->setFormAction($this->ctrl->getFormAction($this));
 
 		return $form;
@@ -261,59 +252,58 @@ class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
 	/**
 	 * Get HTML for element
 	 *
-	 * @param string    page mode (edit, presentation, print, preview, offline)
+	 * @param string $a_mode //(edit, presentation, print, preview, offline)
 	 * @return string   html code
 	 */
-	public function getElementHTML($a_mode, array $a_properties, $a_plugin_version)
+	public function getElementHTML($a_mode, array $a_properties, $plugin_version): string
 	{
 		$this->plugin->setResId($a_properties['resId']);
 		$this->plugin->setVars($a_properties['resId']);
 		if ($this->plugin->getUri() == "") return $this->plugin->txt("failure_create");
 		$counter = $this->plugin->getCounter($a_properties['resId']);
 		$html = "";
-			// $this->plugin->includeClass('../../../../Repository/RepositoryObject/LfEduSharingResource/lib/class.lib.php');
-			// edusharing_add_instance($this->plugin);
 
-		$this->plugin->includeClass('../../../../Repository/RepositoryObject/LfEduSharingResource/lib/class.locallib.php');
-		//see proxy php
-		// show properties stores in the page
-		$this->plugin->includeClass("../../../../Repository/RepositoryObject/LfEduSharingResource/lib/class.lfEduUtil.php");
-		
 		$settings = new ilSetting("xedus");
-		// $redirecturl = edusharing_get_redirect_url($this->plugin, 'window');
-		// $ts = $timestamp = round(microtime(true) * 1000);
-		// $redirecturl .= '&ts=' . $ts;
-		// $data = $settings->get('application_appid') . $ts . edusharing_get_object_id_from_url($this->plugin->getUri());//object_url
-		// $redirecturl .= '&sig=' . urlencode(edusharing_get_signature($data));
-		// $redirecturl .= '&signed=' . urlencode($data);
-		// // '&videoFormat=' . optional_param('videoFormat', '', PARAM_TEXT);
-		// // $redirecturl .= '&closeOnBack=true';
-		// $this->plugin->includeClass('../../../../Repository/RepositoryObject/LfEduSharingResource/lib/class.cclib.php');
-		// $cclib = new mod_edusharing_web_service_factory();
-		// $redirecturl .= '&ticket=' . urlencode(base64_encode(edusharing_encrypt_with_repo_public($cclib -> edusharing_authentication_get_ticket())));
-		// $redirecturlInline = $redirecturl;
+        $eduObj = new ilObjLfEduSharingResource();
+        $eduObj->setUri($this->plugin->getUri());
+        $eduObj->setId($this->plugin->getResId());
+        $eduObj->setRefId($this->plugin->getRefId());
 
-		$redirecturlInline = lfEduUtil::getRenderUrl($this->plugin, 'inline'); //4.1
-		// $redirecturlInline = lfEduUtil::getRenderUrl($this->plugin, 'window');
-// echo('<a href="'.$redirecturlInline.'">test</a>\r\n');
+        $eduSharingService = new EduSharingService();
+        $displaymode = 'inline';
+
+        $utils = new EduSharingUtilityFunctions();
+
+        $redirectUrl = $utils->getRedirectUrl($eduObj, $displaymode);
+        $ts = $timestamp = round(microtime(true) * 1000);
+        $redirectUrl .= '&ts=' . $ts;
+        $data = $settings->get('application_appid') . $ts . $utils->getObjectIdFromUrl($this->plugin->getUri());
+        $baseHelper = new EduSharingHelperBase(
+            $settings->get('application_cc_gui_url'),
+            $settings->get('application_private_key'),
+            $settings->get('application_appid')
+        );
+        $redirectUrl .= '&sig=' . urlencode($baseHelper->sign($data));
+        $redirectUrl .= '&signed=' . urlencode($data);
+
+        $ticket = $eduSharingService->getTicket();
+        $redirectUrl .= '&ticket=' . urlencode(base64_encode($utils->encryptWithRepoKey($ticket)));
+
 		$html .= '<div';
 		if ($this->plugin->getWindowFloat() != 'no') $html .= ' style="float:'.$this->plugin->getWindowFloat().'"';
-		$html .= '>'.$this->filter_edusharing_get_render_html($redirecturlInline).'</div>';
+		$html .= '>'.$this->filter_edusharing_get_render_html($redirectUrl).'</div>';
 		$html = $this->filter_edusharing_display($html);
-		if ($counter == 0) $html .= '<script type="text/javascript" src="./Customizing/global/plugins/Services/COPage/PageComponent/LfEduSharingPageComponent/js/edu.js"></script>';
+//		if ($counter == 0) $html .= '<script type="text/javascript" src="./Customizing/global/plugins/Services/COPage/PageComponent/LfEduSharingPageComponent/js/edu.js"></script>';
 
 		return $html;
 	}
 
 
-	// /**
+    // /**
 	 // *
 	 // */
 	public function delete() {
 		// TODO Delete LfEduSharing content on page component delete
-
-		// The LfEduSharing page component contents will be deleted with the LfEduSharing cronjob
-		
 		// $properties = $this->getProperties();
 		// die(a_properties['resId']);
 		// $LfEduSharing_content = ilLfEduSharingContent::getContentById($properties["content_id"]);
@@ -323,32 +313,15 @@ class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
 		// }
 		
 	}
-
-
-	// /**
-	 // *
-	 // */
 	// public function copy() {
 		// // TODO Copy LfEduSharing content on page component copy
 		// $this->plugin->addInstanceAfterCopy();
 	// }
 
-
-	// /**
-	 // *
-	 // */
 	// public function paste() {
 		// // TODO Paste LfEduSharing content on page component paste
 	// }
 
-
-
-
-
-
-	/**
-	 * @return ilLfEduSharingEditContentFormGUI
-	 */
     /**
      * Get rendered object via curl
      *
@@ -356,10 +329,17 @@ class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
      * @return string
      * @throws Exception
      */
-    public function filter_edusharing_get_render_html($url) {
+    public function filter_edusharing_get_render_html($url): string
+    {
 		$inline = "";
         try {
             $curlhandle = curl_init($url);
+            $proxy = ilProxySettings::_getInstance();
+            if ($proxy->isActive()) {
+                curl_setopt($curlhandle, CURLOPT_HTTPPROXYTUNNEL,  1);
+                curl_setopt($curlhandle, CURLOPT_PROXY, $proxy->getHost());
+                curl_setopt($curlhandle, CURLOPT_PROXYPORT, $proxy->getPort());
+            }
             curl_setopt($curlhandle, CURLOPT_FOLLOWLOCATION, 1);
             curl_setopt($curlhandle, CURLOPT_HEADER, 0);
             // DO NOT RETURN HTTP HEADERS
@@ -372,6 +352,7 @@ class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
 			if($inline === false) {
 				ilLoggerFactory::getLogger('xesp')->warning(curl_error($curlhandle));
 				ilUtil::sendFailure($this->plugin->txt("not_visible_now").' '.curl_error($curlhandle), true);
+                $inline = "";
 			}
         } catch (Exception $e) {
 			ilLoggerFactory::getLogger('xesp')->warning($e->getMessage());
@@ -380,61 +361,31 @@ class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
         curl_close($curlhandle);
         return $inline;
     }
+
     /**
      * Prepare rendered object for display
-     *
-     * @param string $html
      */
-    public function filter_edusharing_display($html) {
+    public function filter_edusharing_display(string $html): string
+    {
 
 		$resid = $this->plugin->getResId();
 		
 		$html = str_replace(array("\n", "\r", "\n"), '', $html);
-
+        $html = str_replace('width:0px','width:'.$this->plugin->getWindowWidth().'px',$html);//; height:'.$this->plugin->getWindowHeight().'px
         /*
          * replaces {{{LMS_INLINE_HELPER_SCRIPT}}}
          */
-        $html = str_replace("{{{LMS_INLINE_HELPER_SCRIPT}}}",
-                ILIAS_HTTP_PATH . "/Customizing/global/plugins/Services/COPage/PageComponent/LfEduSharingPageComponent/inlineHelper.php?resId=" . $resid . "&ref_id=" . $_GET['ref_id'], $html);
-		$customTitle = true;
-        /*
-         * For images, audio and video show a capture underneath object
-         */
-        // $mimetypes = array('jpg', 'jpeg', 'gif', 'png', 'bmp', 'video', 'audio');
-		$mimetypes = array('image', 'video', 'audio'); //4.2
-        $addCaption = false;
-        // foreach ($mimetypes as $mimetype) {
-            // // if (strpos(optional_param('mimetype', '', PARAM_TEXT), $mimetype) !== false) {
-            // if (strpos($this->plugin->getMimetype(), $mimetype) !== false) {
-                // $addCaption = true;
-				// $customTitle = false;
-            // }
-        // }
-        // // if(strpos(optional_param('mediatype', '', PARAM_TEXT), 'tool_object') !== false) {
-        // if(strpos($this->plugin->getMediaType(), 'tool_object') !== false) {
-            // $addCaption = true;
-			// $customTitle = false;
-		// }
-		// if($customTitle)
-			// $html = preg_replace("/<es:title[^>]*>.*<\/es:title>/Uims", utf8_decode($this->plugin->getTitle())), $html);
-        // if($addCaption)
-            // $html .= '<p class="caption">' . $this->plugin->getTitle() . '</p>';
+        $html = str_replace(
+            '{{{LMS_INLINE_HELPER_SCRIPT}}}',
+            ILIAS_HTTP_PATH . "/Customizing/global/plugins/Services/COPage/PageComponent/LfEduSharingPageComponent/inlineHelper.php?resId=" . $resid . "&ref_id=" . $_GET['ref_id'],
+            $html);
 
         return $html;
-        // exit();
     }
 
-	/**
-	 * Get ticket
-	 *
-	 * @param
-	 * @return
-	 */
-	function getTicket() {
-		// include_once('../../../../Repository/RepositoryObject/LfEduSharingResource/lib/class.cclib.php');
-		$this->plugin->includeClass('../../../../Repository/RepositoryObject/LfEduSharingResource/lib/class.cclib.php');
-		$cclib = new mod_edusharing_web_service_factory();
-		return $cclib->edusharing_authentication_get_ticket();
+	protected function getTicket() {
+        $eduSharingService = new EduSharingService();
+        return $eduSharingService->getTicket();
 	}
 
 }

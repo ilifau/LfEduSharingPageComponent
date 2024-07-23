@@ -293,7 +293,7 @@ class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
 		if ($this->plugin->getWindowFloat() != 'no') $html .= ' style="float:'.$this->plugin->getWindowFloat().'"';
 		$html .= '>'.$this->filter_edusharing_get_render_html($redirectUrl).'</div>';
 		$html = $this->filter_edusharing_display($html);
-//		if ($counter == 0) $html .= '<script type="text/javascript" src="./Customizing/global/plugins/Services/COPage/PageComponent/LfEduSharingPageComponent/js/edu.js"></script>';
+		if ($counter == 0) $html .= '<script type="text/javascript" src="./Customizing/global/plugins/Services/COPage/PageComponent/LfEduSharingPageComponent/js/edu.js"></script>';
 
 		return $html;
 	}
@@ -379,6 +379,12 @@ class ilLfEduSharingPageComponentPluginGUI extends ilPageComponentPluginGUI {
             '{{{LMS_INLINE_HELPER_SCRIPT}}}',
             ILIAS_HTTP_PATH . "/Customizing/global/plugins/Services/COPage/PageComponent/LfEduSharingPageComponent/inlineHelper.php?resId=" . $resid . "&ref_id=" . $_GET['ref_id'],
             $html);
+
+        $html = str_replace(
+            '<div class="license" style="max-width: 100%">',
+            '<div class="license" style="max-width: 70%">',
+            $html
+        );
 
         return $html;
     }

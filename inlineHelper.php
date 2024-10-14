@@ -1,7 +1,7 @@
 <?php
 /**
  * Copyright (c) 2018 internetlehrer-gmbh.de
- * GPLv2, see LICENSE 
+ * GPLv3, see LICENSE
  */
 
 /**
@@ -9,7 +9,8 @@
  *
  * @author Uwe Kohnle <kohnle@internetlehrer-gmbh.de>
  * @version $Id$
- */ 
+ */
+use EduSharingApiClient\EduSharingHelperBase;
 chdir("../../../../../../../");
 
 // Avoid redirection to start screen
@@ -18,29 +19,33 @@ $_GET["baseClass"] = "ilStartUpGUI";
 
 require_once "./include/inc.header.php";
 
-require_once('./Customizing/global/plugins/Services/Repository/RepositoryObject/LfEduSharingResource/lib/class.lib.php');
-require_once('./Customizing/global/plugins/Services/COPage/PageComponent/LfEduSharingPageComponent/classes/class.ilLfEduSharingPageComponentPlugin.php');
-
 $plugin = new ilLfEduSharingPageComponentPlugin();
 
 $settings = new ilSetting("xedus");
 
 $plugin->setVars($_GET['resId']);
-if (isset($_GET['childobject_id'])) $childobject_id = $_GET['childobject_id'];//4.2
 
-$redirecturl = edusharing_get_redirect_url($plugin, 'window');
+$eduObj = new ilObjLfEduSharingResource();
+$eduObj->setUri($plugin->getUri());
+$eduObj->setId($plugin->getResId());
+$eduObj->setRefId($plugin->getRefId());
+$eduSharingService = new EduSharingService();
+$utils = new EduSharingUtilityFunctions();
+$redirectUrl = $utils->getRedirectUrl($eduObj, 'window');
 $ts = $timestamp = round(microtime(true) * 1000);
-$redirecturl .= '&ts=' . $ts;
-$data = $settings->get('application_appid') . $ts . edusharing_get_object_id_from_url($plugin->getUri());//object_url
-$redirecturl .= '&sig=' . urlencode(edusharing_get_signature($data));
-$redirecturl .= '&signed=' . urlencode($data);
-$redirecturl .= '&closeOnBack=true';
-$plugin->includeClass('../../../../Repository/RepositoryObject/LfEduSharingResource/lib/class.cclib.php');
-$cclib = new mod_edusharing_web_service_factory();
-$redirecturl .= '&ticket=' . urlencode(base64_encode(edusharing_encrypt_with_repo_public($cclib -> edusharing_authentication_get_ticket())));
+$redirectUrl .= '&ts=' . $ts;
+$data = $settings->get('application_appid') . $ts . $utils->getObjectIdFromUrl($plugin->getUri());
+$baseHelper = new EduSharingHelperBase(
+    $settings->get('application_cc_gui_url'),
+    $settings->get('application_private_key'),
+    $settings->get('application_appid')
+);
+$redirectUrl .= '&sig=' . urlencode($baseHelper->sign($data));
+$redirectUrl .= '&signed=' . urlencode($data);
+$redirectUrl .= '&closeOnBack=true';
+$ticket = $eduSharingService->getTicket();
+$redirectUrl .= '&ticket=' . urlencode(base64_encode($utils->encryptWithRepoKey($ticket)));
 
-if ($childobject_id) $redirecturl .= '&childobject_id=' . $childobject_id; //4.2
-
-ilUtil::redirect($redirecturl);
+ilUtil::redirect($redirectUrl);
 exit;
 ?>
